@@ -34,6 +34,12 @@ namespace LiteMonitor
             cleanMem.Image = Properties.Resources.CleanMem;
             cleanMem.Click += (_, __) => form.CleanMemory();
             menu.Items.Add(cleanMem);
+            var gameReady = new ToolStripMenuItem("Game Ready · 游戏准备");
+            gameReady.Click += (_, __) => GameReadyForm.Open(form);
+            menu.Items.Add(gameReady);
+            var restoreApps = new ToolStripMenuItem("Game Ready · 恢复应用");
+            restoreApps.Click += (_, __) => GameReadyForm.Open(form, restore: true);
+            menu.Items.Add(restoreApps);
             menu.Items.Add(new ToolStripSeparator());
 
             // === 置顶 ===

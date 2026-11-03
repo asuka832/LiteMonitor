@@ -1,5 +1,11 @@
 [English](./README.en.md)
 
+## Game Ready 二开版
+
+在 LiteMonitor 基础上增加游戏准备功能：自动扫描 Steam / Epic 游戏库，保留指定应用，一次清理其他后台并启动游戏，结束后支持重新打开本次关闭的应用。应用选择支持图标、窗口与托盘匹配排序、搜索和多进程合并。功能按需运行，不新增包依赖或常驻扫描任务。
+
+使用方式、构建命令和功能边界见 [Game Ready 使用说明](./docs/game-ready.md)。下方下载链接为上游原版；本分支的二开功能需使用本分支源码构建。
+
 # <img src="./resources/screenshots/logo.png"  width="28" style="vertical-align: middle; margin-top: -4px;" /> LiteMonitor
 一款轻量、可定制的开源桌面硬件监控软件 — 实时监测 CPU、GPU、内存、磁盘、网络等系统性能。
 

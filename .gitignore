@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+game-ready.json
+game-ready-session.json*
+artifacts/
+/settings.json*
+/HardwareHistory.json*
+/TrafficHistory.json*
