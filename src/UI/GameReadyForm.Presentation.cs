@@ -12,7 +12,7 @@ public sealed partial class GameReadyForm
     private readonly Label selectedGame = new() { Text = "请选择游戏", ForeColor = UIColors.TextMain };
     private readonly Label gameCount = new() { Text = "已安装游戏", ForeColor = UIColors.TextSub };
     private readonly Label emptyGames = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
-        Text = "未发现已安装游戏\n\n点击“重新扫描”读取\nSteam / Epic 游戏库。",
+        Text = "未发现已安装游戏\n\n点击“重新扫描”\n或把图标 / EXE 拖到这里。",
         ForeColor = UIColors.TextSub, BackColor = UIColors.CardBg, Padding = new Padding(12) };
     private readonly Label emptyResults = new() { TextAlign = ContentAlignment.MiddleCenter, Text = "暂无清理与恢复记录\n\n可以先预览关闭范围，或启动一次 Game Ready。",
         ForeColor = UIColors.TextSub, BackColor = UIColors.CardBg, Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right };

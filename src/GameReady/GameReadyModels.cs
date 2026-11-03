@@ -1,5 +1,7 @@
 namespace LiteMonitor.GameReady;
 
+using System.Text.Json.Serialization;
+
 public sealed class GameReadyOptions
 {
     public bool AcceptedClosePolicy { get; set; }
@@ -22,8 +24,11 @@ public sealed class GameProfile
     public string InstallDirectory { get; set; } = "";
     public string LaunchUri { get; set; } = "";
     public List<string> ProcessCandidates { get; set; } = new();
+    public bool ProcessPathOverride { get; set; }
     public bool ExitSteam { get; set; }
     public int SteamDelaySeconds { get; set; } = 30;
+    [JsonIgnore]
+    public string CatalogName { get; set; } = "";
     public override string ToString() => Name;
 }
 

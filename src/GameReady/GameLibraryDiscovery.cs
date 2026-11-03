@@ -1,4 +1,6 @@
 using Microsoft.Win32;
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -40,7 +42,8 @@ public static class GameLibraryDiscovery
         token.ThrowIfCancellationRequested();
         var result = new GameDiscoveryResult();
         var libraries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var root in steamRoots.Select(GameReadyPolicy.NormalizePath).Where(p => p.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase))
+        var clientRoots = steamRoots.Select(GameReadyPolicy.NormalizePath).Where(p => p.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        foreach (var root in clientRoots)
         {
             token.ThrowIfCancellationRequested();
             libraries.Add(root);
@@ -79,10 +82,11 @@ public static class GameLibraryDiscovery
                         if (!GameReadyPolicy.IsInside(directory, common) || !Directory.Exists(directory)) return;
                         var candidates = FindExecutables(directory, token);
                         if (candidates.Count == 0) return;
-                        string name = Text(state, "name");
+                        string manifestName = Text(state, "name");
+                        if (manifestName.Length == 0) manifestName = install;
                         result.Games.Add(new GameProfile
                         {
-                            Name = name.Length > 0 ? name : install, SteamAppId = id, InstallDirectory = directory,
+                            Name = manifestName, CatalogName = manifestName, SteamAppId = id, InstallDirectory = directory,
                             ProcessPath = candidates[0], ProcessCandidates = candidates, WorkingDirectory = directory
                         });
                     });
@@ -124,6 +128,7 @@ public static class GameLibraryDiscovery
                 }
             });
         }
+        ApplyLocalizedNames(clientRoots, result);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         result.Games.RemoveAll(g => !seen.Add(Identity(g)));
         result.Games.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Name, b.Name));
@@ -137,10 +142,14 @@ public static class GameLibraryDiscovery
             var existing = options.Games.FirstOrDefault(g => Identity(g).Equals(Identity(game), StringComparison.OrdinalIgnoreCase));
             if (existing == null) { options.Games.Add(game); continue; }
             existing.InstallDirectory = game.InstallDirectory;
-            existing.ProcessCandidates = game.ProcessCandidates;
-            existing.ProcessPath = game.ProcessPath;
+            if (!existing.ProcessPathOverride)
+            {
+                existing.ProcessCandidates = game.ProcessCandidates;
+                existing.ProcessPath = game.ProcessPath;
+            }
             if (existing.WorkingDirectory.Length == 0) existing.WorkingDirectory = game.WorkingDirectory;
             if (existing.LaunchUri.Length == 0) existing.LaunchUri = game.LaunchUri;
+            if (ShouldRefreshName(existing.Name, game)) existing.Name = game.Name;
         }
     }
 
@@ -233,4 +242,160 @@ public static class GameLibraryDiscovery
         return Read(0);
     }
     private static string Unquote(string value) => value[1..^1].Replace("\\\"", "\"").Replace("\\\\", "\\");
+
+    public static string ChooseDisplayName(string manifest, IReadOnlyDictionary<string, string> localized, string uiLanguage)
+    {
+        uiLanguage ??= "";
+        bool traditional = uiLanguage.StartsWith("zh-TW", StringComparison.OrdinalIgnoreCase) ||
+            uiLanguage.StartsWith("zh-HK", StringComparison.OrdinalIgnoreCase) ||
+            uiLanguage.StartsWith("zh-MO", StringComparison.OrdinalIgnoreCase) ||
+            uiLanguage.StartsWith("zh-Hant", StringComparison.OrdinalIgnoreCase);
+        bool chinese = traditional || uiLanguage.Equals("zh", StringComparison.OrdinalIgnoreCase) ||
+            uiLanguage.StartsWith("zh-", StringComparison.OrdinalIgnoreCase);
+        if (!chinese) return manifest;
+        string primary = traditional ? "tchinese" : "schinese";
+        string secondary = traditional ? "schinese" : "tchinese";
+        if (localized.TryGetValue(primary, out string? name) && !string.IsNullOrWhiteSpace(name)) return name;
+        if (localized.TryGetValue(secondary, out name) && !string.IsNullOrWhiteSpace(name)) return name;
+        return manifest;
+    }
+
+    private static bool ShouldRefreshName(string current, GameProfile discovered)
+    {
+        if (discovered.Name.Length == 0) return false;
+        if (current.Length == 0 || current == "\u65b0\u6e38\u620f") return true;
+        return discovered.CatalogName.Length > 0 && current.Equals(discovered.CatalogName, StringComparison.Ordinal) &&
+            !current.Equals(discovered.Name, StringComparison.Ordinal);
+    }
+
+    private static void ApplyLocalizedNames(IReadOnlyList<string> steamRoots, GameDiscoveryResult result)
+    {
+        var ids = result.Games.Select(g => g.SteamAppId).Where(id => id.Length > 0).ToHashSet(StringComparer.Ordinal);
+        if (ids.Count == 0) return;
+        var names = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        foreach (string root in steamRoots)
+        {
+            string file = Path.Combine(root, "appcache", "appinfo.vdf");
+            if (!File.Exists(file)) continue;
+            try { ReadAppInfoNames(file, ids, names); }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or EndOfStreamException or ArgumentException)
+            { result.Warnings.Add(Path.GetFileName(file) + "\uff1a" + ex.Message); }
+            if (ids.All(names.ContainsKey)) break;
+        }
+        string language = CultureInfo.CurrentUICulture.Name;
+        foreach (var game in result.Games)
+        {
+            if (game.CatalogName.Length == 0) game.CatalogName = game.Name;
+            if (game.SteamAppId.Length > 0 && names.TryGetValue(game.SteamAppId, out var localized))
+                game.Name = ChooseDisplayName(game.CatalogName, localized, language);
+        }
+    }
+
+    private static void ReadAppInfoNames(string file, IReadOnlySet<string> appIds, Dictionary<string, Dictionary<string, string>> names)
+    {
+        var wanted = new HashSet<uint>();
+        foreach (string id in appIds)
+            if (uint.TryParse(id, out uint value) && value != 0) wanted.Add(value);
+        if (wanted.Count == 0) return;
+        using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        if (stream.Length < 24 || stream.Length > 48L * 1024 * 1024) throw new InvalidDataException("Steam \u6e38\u620f\u4fe1\u606f\u7f13\u5b58\u65e0\u6cd5\u8bfb\u53d6\u3002");
+        using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
+        if (reader.ReadUInt32() != 0x07564429) return;
+        reader.ReadUInt32();
+        long table = reader.ReadInt64();
+        if (table < 16 || table >= stream.Length - 4) throw new InvalidDataException("Steam \u6e38\u620f\u4fe1\u606f\u7f13\u5b58\u65e0\u6548\u3002");
+        stream.Position = table;
+        int count = reader.ReadInt32();
+        if (count < 0 || count > 500_000) throw new InvalidDataException("Steam \u6e38\u620f\u4fe1\u606f\u7f13\u5b58\u8fc7\u5927\u3002");
+        var strings = new string[count];
+        for (int i = 0; i < count; i++) strings[i] = ReadCString(reader, stream.Length, 8192);
+        stream.Position = 16;
+        while (stream.Position + 8 <= table && wanted.Count > 0)
+        {
+            uint appId = reader.ReadUInt32();
+            if (appId == 0) break;
+            uint size = reader.ReadUInt32();
+            long end = stream.Position + size;
+            if (size < 60 || end > table) throw new InvalidDataException("Steam \u6e38\u620f\u4fe1\u606f\u8bb0\u5f55\u65e0\u6548\u3002");
+            if (!wanted.Contains(appId)) { stream.Position = end; continue; }
+            stream.Position += 60;
+            try
+            {
+                var localized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                ReadNameSection(reader, end, strings, "", localized, 0);
+                if (localized.Count > 0) names[appId.ToString(CultureInfo.InvariantCulture)] = localized;
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or EndOfStreamException) { }
+            stream.Position = end;
+            wanted.Remove(appId);
+        }
+    }
+
+    private static void ReadNameSection(BinaryReader reader, long end, string[] strings, string parent, Dictionary<string, string> found, int depth)
+    {
+        if (depth > 32) throw new InvalidDataException("appinfo \u5d4c\u5957\u8fc7\u6df1\u3002");
+        while (reader.BaseStream.Position < end)
+        {
+            if (reader.BaseStream.Position >= end) throw new EndOfStreamException();
+            byte type = reader.ReadByte();
+            if (type == 8) return;
+            if (reader.BaseStream.Position + 4 > end) throw new EndOfStreamException();
+            uint index = reader.ReadUInt32();
+            if (index >= strings.Length) throw new InvalidDataException("appinfo \u952e\u7d22\u5f15\u65e0\u6548\u3002");
+            string key = strings[index];
+            switch (type)
+            {
+                case 0:
+                    ReadNameSection(reader, end, strings, key, found, depth + 1);
+                    break;
+                case 1:
+                    string value = ReadCString(reader, end, 2048);
+                    if (parent.Equals("name_localized", StringComparison.OrdinalIgnoreCase) &&
+                        (key.Equals("schinese", StringComparison.OrdinalIgnoreCase) || key.Equals("tchinese", StringComparison.OrdinalIgnoreCase)) &&
+                        value.Length > 0 && !found.ContainsKey(key))
+                        found[key] = value;
+                    break;
+                case 2:
+                case 3:
+                case 4:
+                case 6:
+                    Skip(reader, end, 4);
+                    break;
+                case 5:
+                    while (true)
+                    {
+                        if (reader.BaseStream.Position + 2 > end) throw new EndOfStreamException();
+                        if (reader.ReadUInt16() == 0) break;
+                    }
+                    break;
+                case 7:
+                case 10:
+                    Skip(reader, end, 8);
+                    break;
+                default:
+                    throw new InvalidDataException("appinfo \u5b57\u6bb5\u7c7b\u578b\u65e0\u6548\u3002");
+            }
+        }
+    }
+
+    private static void Skip(BinaryReader reader, long end, int count)
+    {
+        if (reader.BaseStream.Position + count > end) throw new EndOfStreamException();
+        reader.BaseStream.Position += count;
+    }
+
+    private static string ReadCString(BinaryReader reader, long end, int maxLength)
+    {
+        var buffer = new List<byte>(32);
+        while (buffer.Count <= maxLength)
+        {
+            if (reader.BaseStream.Position >= end) throw new EndOfStreamException();
+            byte value = reader.ReadByte();
+            if (value == 0) return Encoding.UTF8.GetString(buffer.ToArray());
+            buffer.Add(value);
+        }
+        throw new InvalidDataException("appinfo \u5b57\u7b26\u4e32\u8fc7\u957f\u3002");
+    }
+
+
 }

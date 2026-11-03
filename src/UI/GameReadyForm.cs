@@ -98,7 +98,7 @@ public sealed partial class GameReadyForm : Form
 
     private void BuildGameTab()
     {
-        var page = MakePage("游戏准备", "选择游戏，清理一次后台，然后开始游戏。");
+        var page = MakePage("游戏准备", "选择游戏，清理一次后台，然后开始游戏。未识别时把图标或 EXE 拖到左侧列表。");
         var body = new Panel { Dock = DockStyle.Fill };
         var left = new Panel { Dock = DockStyle.Left, Width = 225, Padding = new Padding(0, 0, 20, 0) };
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 42, Padding = new Padding(0, 10, 0, 0) };
@@ -124,6 +124,9 @@ public sealed partial class GameReadyForm : Form
         var librarySurface = new Panel { Dock = DockStyle.Fill, BackColor = UIColors.CardBg };
         librarySurface.Controls.Add(games);
         librarySurface.Controls.Add(emptyGames);
+        EnableGameDrop(games);
+        EnableGameDrop(librarySurface);
+        EnableGameDrop(emptyGames);
         games.BringToFront();
         left.Controls.Add(librarySurface);
         left.Controls.Add(buttons);
@@ -209,7 +212,7 @@ public sealed partial class GameReadyForm : Form
         table.Controls.Add(control, 1, row);
     }
 
-    private static Control WithBrowse(TextBox input)
+    private Control WithBrowse(TextBox input)
     {
         var panel = new Panel { Height = 28 };
         var browse = new LiteButton("选择…") { Dock = DockStyle.Right, Width = 65, Height = 28 };
@@ -221,7 +224,77 @@ public sealed partial class GameReadyForm : Form
             using var dialog = new OpenFileDialog { Filter = "应用程序|*.exe", CheckFileExists = true };
             if (dialog.ShowDialog(panel.FindForm()) == DialogResult.OK) input.Text = dialog.FileName;
         };
+        void Drop(string[] dropped)
+        {
+            if (busy) return;
+            foreach (string file in dropped)
+            {
+                try
+                {
+                    string? exe = GameShortcutImport.ExecutableFrom(file);
+                    if (exe == null) continue;
+                    input.Text = exe;
+                    break;
+                }
+                catch (Exception ex) { WriteLog("无法读取拖入路径：" + ex.Message); }
+            }
+        }
+        ShellFileDrop.Attach(panel, Drop);
+        ShellFileDrop.Attach(input, Drop);
+        ShellFileDrop.Attach(browse, Drop);
         return panel;
+    }
+
+    private void EnableGameDrop(Control control)
+    {
+        ShellFileDrop.Attach(control, async files =>
+            await PerformAsync(token => AddDroppedFilesAsync(files, token)));
+    }
+
+    private async Task AddDroppedFilesAsync(string[] files, CancellationToken token)
+    {
+        SaveGame();
+        GameProfile? last = null;
+        int added = 0;
+        GameDiscoveryResult? scanned = null;
+        foreach (string file in files.Where(f => !string.IsNullOrWhiteSpace(f)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!GameShortcutImport.IsSupported(file))
+            {
+                WriteLog("\u8df3过不支持的文件：" + Path.GetFileName(file));
+                continue;
+            }
+            GameProfile? incoming;
+            try { incoming = GameShortcutImport.Read(file); }
+            catch (Exception ex) { WriteLog(Path.GetFileName(file) + "\uff1a" + ex.Message); continue; }
+            if (incoming == null)
+            {
+                WriteLog("\u6ca1有识别到程序：" + Path.GetFileName(file));
+                continue;
+            }
+            GameShortcutImport.CompleteFromLibrary(incoming, options.Games);
+            if (incoming.SteamAppId.Length > 0 && incoming.ProcessPath.Length == 0)
+            {
+                scanned ??= await Task.Run(() => GameLibraryDiscovery.ScanInstalled(token), token);
+                token.ThrowIfCancellationRequested();
+                GameShortcutImport.CompleteFromLibrary(incoming, scanned.Games);
+            }
+            bool known = options.Games.Any(g => GameShortcutImport.SameGame(g, incoming));
+            last = GameShortcutImport.Apply(options, editing, incoming);
+            if (!known && ReferenceEquals(last, incoming)) added++;
+        }
+        if (last == null) { WriteLog("请拖入游戏 EXE、.lnk 快捷方式或 Steam 图标（.url）。"); return; }
+        RebindGames(last);
+        if (last.ProcessPath.Length == 0)
+        {
+            advanced.Visible = true;
+            (advanced.Parent as ScrollableControl)?.ScrollControlIntoView(advanced);
+            WriteLog($"\u5df2添加《{last.Name}\u300b。还没有主程序路径，请把游戏 EXE 拖到路径框，或点“选择”。");
+        }
+        else if (added > 0)
+            WriteLog($"\u5df2从拖放添加 {added} 个游戏，记得保存配置。");
+        else
+            WriteLog($"\u5df2选择《{last.Name}\u300b。");
     }
 
     private void BuildKeepTab()
@@ -300,7 +373,13 @@ public sealed partial class GameReadyForm : Form
         editing.Name = name.Text.Trim();
         editing.SteamAppId = appId.Text.Trim();
         editing.ExecutablePath = WindowsGameReadyPlatform.ResolveExecutablePath(executable.Text.Trim());
-        editing.ProcessPath = WindowsGameReadyPlatform.ResolveExecutablePath(processPath.Text.Trim());
+        string process = WindowsGameReadyPlatform.ResolveExecutablePath(processPath.Text.Trim());
+        if (!GameReadyPolicy.SamePath(process, editing.ProcessPath) && process.Length > 0)
+        {
+            editing.ProcessPathOverride = true;
+            editing.ProcessCandidates = new() { process };
+        }
+        editing.ProcessPath = process;
         editing.Arguments = arguments.Text;
         editing.WorkingDirectory = workingDirectory.Text.Trim();
         editing.ExitSteam = exitSteam.Checked;

@@ -1,188 +1,158 @@
-[English](./README.en.md)
+# LiteMonitor · Game Ready
 
-## Game Ready 二开版
+**游戏开始前，一次整理后台；游戏结束后，重新打开常用应用。**
 
-在 LiteMonitor 基础上增加游戏准备功能：自动扫描 Steam / Epic 游戏库，保留指定应用，一次清理其他后台并启动游戏，结束后支持重新打开本次关闭的应用。应用选择支持图标、窗口与托盘匹配排序、搜索和多进程合并。功能按需运行，不新增包依赖或常驻扫描任务。
+基于 [Diorser/LiteMonitor](https://github.com/Diorser/LiteMonitor) 的个人二开版，为内存紧张、希望减少游戏后台占用的 Windows 电脑加入 **Game Ready**。保留原有硬件监控，在同一个软件里完成游戏发现、应用保留、后台退出和应用恢复。
 
-使用方式、构建命令和功能边界见 [Game Ready 使用说明](./docs/game-ready.md)。下方下载链接为上游原版；本分支的二开功能需使用本分支源码构建。
+二开维护：[asuka832](https://github.com/asuka832) · [详细使用说明](./docs/game-ready.md) · [上游英文介绍](./README.en.md)
 
-# <img src="./resources/screenshots/logo.png"  width="28" style="vertical-align: middle; margin-top: -4px;" /> LiteMonitor
-一款轻量、可定制的开源桌面硬件监控软件 — 实时监测 CPU、GPU、内存、磁盘、网络等系统性能。
+> 二开代码目前位于 **`codex/game-ready` 分支**。上游 Releases 中的原版不包含 Game Ready，请使用此分支构建。
 
-A lightweight and customizable desktop hardware monitoring tool — real-time monitoring of system performance such as CPU, GPU, memory, disk, and network.
+## 新增了什么
 
-支持横/竖屏/任务栏/网页显示、主题切换、多语言、透明度显示、三色报警等，界面简洁且高度可配置 。
-> 🟢 **立即下载最新版本：** [📦 GitHub Releases → LiteMonitor 最新版](https://github.com/Diorser/LiteMonitor/releases/latest)    /  [⏬国内镜像网站下载](https://litemonitor.cn/)    
+| 功能 | 使用体验 |
+| --- | --- |
+| 自动发现游戏 | 打开 Game Ready 时读取 Steam / Epic 游戏库，自动填入游戏名称、启动入口和主程序路径；支持多个 Steam 库。 |
+| 拖入图标与路径 | 将游戏 EXE、快捷方式或 Steam 图标拖到游戏列表，自动补全本地路径；路径框支持拖入 EXE，手动指定路径会在重新扫描时保留。 |
+| 保留名单 | 提前选择游戏期间仍需运行的应用，其余普通用户应用进入关闭候选。 |
+| 更容易认出的应用列表 | 显示图标、友好名称、EXE、窗口标题和进程数量；窗口应用优先，托盘匹配其次。支持搜索，同一路径的多个进程合并为一项。 |
+| 一次清理并启动 | 先请求应用正常退出，超时后强制结束仍在运行的候选，再启动选定游戏。只清理一次。 |
+| 退出范围预览 | 执行前查看哪些进程将关闭、哪些受到保护及其原因。 |
+| 应用恢复 | 记录本次关闭的应用，游戏结束后手动一键重新打开；已在运行的应用跳过，失败项可重试。 |
+| 按游戏设置 Steam 策略 | 默认保留客户端后台；可为经实测兼容的游戏开启启动后尝试退出 Steam。 |
+| 与原设置页一致的界面 | 侧栏导航、白色设置分组和蓝色主按钮；程序路径、高级配置和日志按需展开。 |
 
-> 🟢 已支持【内存清理】和【自定义插件】功能，详见：[插件开发指南（无需编程）](./resources/plugins/PLUGIN_DEV_GUIDE.md#🔌-plugin-system)
+原有的 CPU / GPU / 内存 / 磁盘 / 网络等监控、桌面和任务栏显示、主题及插件功能继续沿用 LiteMonitor。原项目的 JSON 插件指南见 [插件开发指南](./resources/plugins/PLUGIN_DEV_GUIDE.md)。**Game Ready 是主程序扩展，不是 JSON 插件。**
 
+## 快速开始
 
-![LiteMonitor 主界面](./resources/screenshots/overview.png)
+### 运行环境
 
-###  🟢 横条模式 / 任务栏显示模式
-![LiteMonitor 横屏/任务栏显示](./resources/screenshots/overview3.png)
+- Windows 10 / 11，x64。
+- 运行本文发布命令生成的便携版，需要 **.NET 8 Windows Desktop Runtime**。
+- 程序沿用上游的管理员运行清单及硬件监控初始化流程。
 
+将构建产物放到有写入权限的目录，运行 `LiteMonitor.exe`。保留完整目录中的 `resources` 和辅助库，不要只复制主 EXE。
 
-# 🖥️ 系统监控功能
+### 第一次使用
 
-| 分类 | 监控指标 |
-|------|-----------|
-| 💻 **处理器（CPU）**  | 实时监测 CPU 使用率、温度、频率、功耗、风扇、水冷等数据。 |
-| 🎮 **显卡（GPU）**  | 展示 GPU 使用率、核心温度、显存、频率、功耗 风扇，兼容 NVIDIA / AMD / Intel 显卡。 |
-| 💾 **主机（HOST）** | 显示系统内存占用、FPS刷新率、磁盘温度、主板温度、机箱风扇等，清晰了解电脑综合情况。 |
-| 🔋 **电池（Battery）** | 监测电池状态（充电状态、电量、功耗、电流、电压等）。 |
-| 📀 **磁盘（Disk）**   | 监控磁盘读取与写入速度（KB/s、MB/s），帮助分析存储 I/O 活跃情况。支持自动/手动选择磁盘。 |
-| 🌐 **网络（Network）** | 实时显示上传与下载速度（KB/s、MB/s），提供轻量级网络流量监控。支持自动/手动选择网卡。 |
-| 📈 **流量统计（Traffic）** | 统计每日上传与下载流量，帮助分析网络使用习惯。 |
-| 🔌 **插件系统（Plugin）** | 支持监控天气、股票、加密货币、代理延迟、汇率等，支持自定义插件，扩展监控项与功能。 |
-| 🔧 **硬件传感器（Sensors）** | 硬件详情面板可以查看和监控所有系统硬件传感器数据。 |
+1. 在主界面或托盘右键菜单选择 **Game Ready · 游戏准备**，也可以从设置页进入。
+2. 等待自动扫描，选择想玩的游戏。新安装游戏后可点击 **重新扫描**；未识别时可把桌面游戏图标、快捷方式或 EXE 拖到左侧列表，也可通过 **手动添加** 补充。路径框支持直接拖入 EXE，修改后点击 **保存配置**。
+3. 打开 **保留名单**，点击 **从运行中应用添加…**，勾选需要保留的浏览器、聊天软件、语音工具等。普通后台进程默认隐藏，可搜索或开启 **显示其他后台进程**。
+4. 点击 **预览关闭范围**，确认需要的应用受到保护。在游戏准备页确认退出策略，保存配置。
+5. 点击 **清理并启动游戏**。清理完成后，新启动或自行重启的应用不会被继续关闭。
+6. 游戏结束后点击 **恢复应用**，或从右键菜单选择 **Game Ready · 恢复应用**。
 
+日常流程：**选游戏 → 预览范围 → 清理并启动 → 结束后恢复应用**。
 
+## 清理和恢复如何工作
 
-> 💡 LiteMonitor 持续完善中，如需更多监控项或功能支持，欢迎在 [GitHub Issues](https://github.com/Diorser/LiteMonitor/issues) 中反馈建议！
+### 保留名单是“留下谁”
 
----
+名单内的应用保留；名单外的普通用户应用，包括已打开的窗口，可能被关闭。名单按 EXE 完整路径匹配，不区分大小写；能够确认关系的现有子进程也会受到保护。没有父子关系的独立辅助程序需要单独加入。
 
-###  🟢 网络测速功能 
-![LiteMonitor 网速测试](./resources/screenshots/overview4.png)  👉 ![LiteMonitor 菜单](./resources/screenshots/overview5.jpg)
+Windows 关键组件、系统及驱动服务、桌面 Shell、其他用户或登录会话、LiteMonitor 自身和所选游戏等由保护规则排除。身份或权限无法确认的进程会被跳过，原因可在预览中查看。
 
+### 正常退出优先，但仍有强制阶段
 
-###  🟢 监控历史
-![LiteMonitor 监控历史](./resources/screenshots/overview9.png)
+默认请求正常退出后等待 **10 秒**，超时的候选再尝试强制结束。没有正常退出接口的后台进程也会经过等待阶段。
 
-###  🟢 历史流量统计
-![LiteMonitor 主题编辑器](./resources/screenshots/overview7.png)
+**保存对话框不会自动获得豁免，强制结束仍可能丢失未保存内容。** 请先保存工作，并将游戏期间需要的程序加入保留名单。取消操作只停止后续步骤，已经退出的应用需要通过恢复功能重新打开。
 
-###  🟢 网页版监控
-![LiteMonitor 网页版监控](./resources/screenshots/web.png)
- 
----
+### 恢复是重新启动应用
 
-# 产品功能
+恢复不承诺还原文档、标签页、原窗口或登录状态，这些取决于应用自身。有窗口的普通主程序会自动记录恢复入口；无窗口应用可以在 **后台应用恢复** 中补充可直接启动的主程序路径。
 
-| 功能 | 说明 |
-|---|---|
-| 🎨 自定义主题 | 通过 JSON 定义颜色、字体、间距、圆角等，主题可扩展与复用。主题系统 v2 更易维护。 |
-| 🟥🟨🟩 **三色报警** | 监控项根据阈值自动切换进度条/数值颜色，支持自定义颜色与网络/磁盘独立阈值。 |
-| 🌍 多语言界面 | 内置多语言，所有菜单/短标签/监控项即时国际化。 |
-| 📊 监控项显示管理 | 按需显示或隐藏 CPU、GPU、VRAM、内存、磁盘、网络等模块。 |
-| 🧮 **横屏模式** | 全新横条布局，支持每列独立宽度、单位智能格式化、两行显示、自动计算面板宽度。 |
-| 📏 面板宽度调整 | 即时调整面板宽度，布局自动重排。 |
-| 🔠 **UI 缩放** | 自适应 DPI + 用户自定义缩放，界面与字体完美比例缩放。 |
-| 🎞️ **动画平滑** | 数值更新支持平滑动画，降低突变带来的跳动感，可自行调节速度。 |
-| 🪟 窗口与界面 | 圆角显示、透明度调节、阴影、高质量字体渲染，视觉干净优雅。 |
-| 🧭 靠边自动隐藏 | 靠屏幕边缘自动收起，靠近边缘自动弹出，支持多屏幕正确判断。 |
-| 🧲 **限制拖出屏幕** | 选项开启后，窗口不可拖出屏幕可视区域。 |
-| 👆 鼠标穿透模式 | 启用后，窗口不拦截鼠标事件，可直接操作背后应用。 |
-| 🎨 UI 与主题即时切换 | 切换主题/语言后界面即时刷新，无需重启。 |
-| 🔍 数值智能格式化 | 自动格式化单位与小数位，横屏模式支持智能“/s”去除、>=100 自动取整等。 |
-| 🔄 自动更新检测 | 启动时静默检查新版本，手动检查时展示弹窗。支持国内与 GitHub 双源。 |
-| 🚀 开机自启 | 通过计划任务方式实现管理员级别自启动。 |
-| 📂 配置文件存储 | 所有设置实时写入 `settings.json`，支持迁移与备份。 |
+辅助进程或无法可靠识别启动入口的应用会标记为需手动打开。不要将 renderer、更新器或需要特定命令行参数的宿主填为恢复入口。
 
----
+恢复记录先保存再执行退出。取消、游戏启动失败或程序重启后仍可读取；存在待恢复项时，不会静默覆盖旧会话。可在 **清理与恢复** 中选择 **放弃本次恢复**，旧记录会保留为备份。
 
-## 📦 安装与使用
+## Steam、截图和游戏兼容性
 
-1. 前往 [Releases 页面](https://github.com/Diorser/LiteMonitor/releases) 下载最新版压缩包  
-2. 解压后运行 `LiteMonitor.exe`  
-3. 程序会自动根据系统语言加载对应语言文件
+| 项目 | 当前行为 |
+| --- | --- |
+| Steam 默认策略 | 清理期间保留；游戏启动后尝试关闭主窗口，保留客户端后台。 |
+| 游戏启动后退出 Steam | 按游戏单独开启，默认延迟 30 秒再请求正常退出；客户端拒绝退出时保留，不升级为强杀。Steam 组件被显式加入保留名单时，保留名单优先。 |
+| 退出 Steam 的兼容性 | 游戏进程出现不代表它已经不依赖 Steam，需要逐款实测；客户端功能和云存档同步也需自行确认。 |
+| NVIDIA Alt+F1 | 默认启用保留 NVIDIA 覆盖层的预设；实际截图是否正常，仍需在自己的 NVIDIA App 版本上验证。 |
+| 《影之刃零》 | 已在开发环境中通过只读扫描识别安装目录及主程序；退出 Steam 后的运行兼容性尚未验证，默认不开启退出选项。 |
 
----
+## 小巧与低占用
 
-## 🎨 主题系统
+Game Ready 使用项目已有的 .NET / Windows Forms 和 Windows 原生接口，**没有新增 NuGet 包依赖，也没有常驻清理或整盘扫描任务**。
 
-主题文件位于 `/themes/` 目录。
+- 游戏库在打开功能窗口或手动刷新时扫描，范围限定在平台记录的安装目录。
+- 游戏启动等待有超时，按候选 EXE 查询；运行后通过进程退出事件发送通知，不轮询整个游戏过程。
+- 应用图标在打开选择窗口时异步读取，关闭后释放。
+- 清理只针对本次快照，不持续拦截新进程，不默认执行全局工作集修剪。
 
-示例：
-```json
-{
-  "name": "DarkFlat_Classic",
-  "layout": { "rowHeight": 40, "cornerRadius": 10 },
-  "color": {
-    "background": "#202225",
-    "textPrimary": "#EAEAEA",
-    "barLow": "#00C853"
-  }
-}
-```
+目标是腾出不需要的后台应用所占内存。实际收益取决于当时运行的程序，**不保证消除游戏内存不足或带来固定的帧率提升**。
 
-> ✨ 主题系统 v2 新特点：  
-> - 布局字段更精简、统一  
-> - 字体与布局分别独立缩放  
-> - 所有布局由 Theme.Scale 自动处理  
-> - 更容易构建自己的主题模板  
+## 从源码构建
 
----
+需要 Git 和 **.NET 8 SDK**。以下命令在 Windows PowerShell 中执行：
 
-## ⚙️ 设置文件（settings.json）
-
-| 字段 | 说明 |
-|------|------|
-| `Skin` | 当前主题名称 |
-| `PanelWidth` | 面板宽度（支持横竖屏两种模式） |
-| `UIScale` | 用户界面缩放倍率 |
-| `Opacity` | 透明度（0.1 ~ 1.0） |
-| `Language` | 当前语言（自动检测或手动切换） |
-| `TopMost` | 是否置顶窗口 |
-| `AutoStart` | 是否开机启动 |
-| `AutoHide` | 是否启用靠边自动隐藏 |
-| `ClampToScreen` | 拖动后限制窗口在屏幕内 |
-| `ClickThrough` | 是否启用鼠标穿透 |
-| `RefreshMs` | 刷新间隔（支持完整预设） |
-| `AnimationSpeed` | 数值平滑动画速度 |
-| `HorizontalMode` | 横屏/竖屏显示模式 |
-| `PreferredNetwork` | 手动选择网卡（空=自动） |
-| `PreferredDisk` | 手动选择磁盘（空=自动） |
-| `Enabled` | 各监控项开关（CPU/GPU/MEM/NET/DISK） |
-
----
-
-## 🧩 架构概览
-
-| 文件 | 功能 |
-|------|------|
-| `MainForm_Transparent.cs` | 主窗体、拖拽、菜单托盘、自动隐藏、透明度、位置保存 |
-| `UIController.cs` | 主题加载、DPI/UIScale 缩放、布局重构、渲染入口、定时刷新 |
-| `UIRenderer.cs` | 竖屏渲染器（组块、进度条、标题渲染） |
-| `HorizontalRenderer.cs` | 横屏渲染器（两行布局、智能标签与数值） |
-| `UILayout.cs` | 竖屏动态布局计算 |
-| `HorizontalLayout.cs` | 横屏列宽计算、面板总宽度计算 |
-| `ThemeManager.cs` | 主题加载、颜色解析、字体构建 |
-| `LanguageManager.cs` | 多语言加载、扁平化 Key 访问 |
-| `HardwareMonitor.cs` | 采集 CPU/GPU/MEM/NET/DISK 信息；自动/手动设备选择 |
-| `AutoStart.cs` | 管理计划任务，实现开机自启 |
-| `UpdateChecker.cs` | GitHub + 国内双源版本检测 |
-| `AboutForm.cs` | 关于窗口 |
-
----
-
-## 🛠️ 编译说明
-
-### 环境要求
-- Windows 10 / 11  
-- .NET 8 SDK  
-- Visual Studio 2022 或 Rider
-
-### 编译命令
-```bash
-git clone https://github.com/Diorser/LiteMonitor.git
+```powershell
+git clone --branch codex/game-ready https://github.com/asuka832/LiteMonitor.git
 cd LiteMonitor
-dotnet build -c Release
+dotnet restore LiteMonitor.csproj --source https://api.nuget.org/v3/index.json
+dotnet build LiteMonitor.csproj -c Release --no-restore
 ```
 
-输出文件：
+普通构建入口：`bin/Release/net8.0-windows/LiteMonitor.exe`。
+
+生成便携版：
+
+```powershell
+dotnet publish LiteMonitor.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o artifacts/GameReady-win-x64
 ```
-/bin/Release/net8.0-windows/LiteMonitor.exe
+
+产物位于 `artifacts/GameReady-win-x64/`。此方式不捆绑 .NET 运行时；分发时请保留整个目录。
+
+### 验证
+
+```powershell
+# 核心回归：使用模拟平台，不批量关闭用户应用
+dotnet run --project test/GameReady/GameReady.Tests.csproj -c Release
+
+# 原生检查：只读枚举，并仅结束测试自己创建的专用子进程
+dotnet run --project test/GameReady/GameReady.Tests.csproj -c Release -- --native
+
+# 配置窗口渲染检查
+dotnet run --project test/GameReady.UI/GameReady.UI.csproj -c Release
+
+# 应用选择窗口：图标、分组、搜索和勾选状态检查
+dotnet run --project test/GameReady.UI/GameReady.UI.csproj -c Release -- artifacts/game-ready-picker-preview --picker
 ```
 
----
+UI 检查导出的是测试程序的控件渲染图，不是用户桌面的直接截图。游戏实机兼容性、真实应用的保存及恢复行为需要另行验证。
 
-## 📄 开源协议
-本项目基于 **MIT License** 开源，可自由使用、修改与分发。
+## 配置文件
 
----
+文件保存在运行程序的目录中，迁移时可一并备份。
 
-## 📬 联系方式
-**作者**：Diorser  
-**项目主页**：[https://github.com/Diorser/LiteMonitor](https://github.com/Diorser/LiteMonitor)
+| 文件 | 内容 |
+| --- | --- |
+| `settings.json` | LiteMonitor 原有设置。 |
+| `game-ready.json` | 游戏、保留名单、退出策略和后台恢复入口。 |
+| `game-ready-session.json` | 当前会话的退出结果与恢复记录。 |
+| `game-ready-session.json.discarded-*` | 放弃恢复时保留的旧会话备份。 |
+
+构建目录和个人运行配置已加入 Git 忽略规则。更多说明见 [完整使用文档](./docs/game-ready.md)。
+
+## 当前范围
+
+- 自动扫描支持 Steam / Epic 的已安装 Windows 游戏；暂未覆盖 Xbox、WeGame 或没有平台记录的独立游戏。
+- 主程序识别依据安装信息和文件特征，特殊目录结构可能需要在高级配置中修正。
+- 托盘分类是系统可读记录或图标名称的匹配结果，不等同于实时托盘进程清单。
+- 新增 Game Ready 界面主要使用中文；原有监控界面的多语言功能沿用上游。
+- 软件内更新检测仍指向上游原版。更新二开版请使用此分支的构建，直接安装上游更新可能覆盖 Game Ready 功能。
+
+## 上游与致谢
+
+感谢 **Diorser** 开发 [LiteMonitor](https://github.com/Diorser/LiteMonitor)，提供硬件监控、主题、插件和界面基础。本仓库是个人二开版本，Game Ready 的新增功能与问题请和上游原版区分。
+
+- [上游项目](https://github.com/Diorser/LiteMonitor)
+- [上游英文介绍](./README.en.md)
+- [Game Ready 使用说明](./docs/game-ready.md)
+- [首版验证记录](./docs/game-ready-validation.md)

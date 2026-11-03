@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
 using LiteMonitor.src.UI;
 
 internal static class Program
@@ -68,6 +70,26 @@ internal static class Program
         var options = (LiteMonitor.GameReady.GameReadyOptions)typeof(GameReadyForm).GetField("options", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(form)!;
         options.Games.Clear();
         rebind.Invoke(form, new object?[] { null });
+        string droppedExe = Path.Combine(output, "DropTest.exe");
+        File.WriteAllText(droppedExe, "test fixture, never executed");
+        DropFile(gameList, droppedExe);
+        if (options.Games.Count != 1 || !LiteMonitor.GameReady.GameReadyPolicy.SamePath(options.Games[0].ProcessPath, droppedExe))
+            throw new Exception("Native EXE drop must add one game with its path.");
+        DropFile(gameList, droppedExe);
+        if (options.Games.Count != 1) throw new Exception("Repeated native drops must not duplicate games.");
+        advanced.Visible = true;
+        Application.DoEvents();
+        string correctedExe = Path.Combine(output, "Corrected.exe");
+        File.WriteAllText(correctedExe, "test fixture, never executed");
+        var processInput = (TextBox)typeof(GameReadyForm).GetField("processPath", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(form)!;
+        DropFile(processInput, correctedExe);
+        typeof(GameReadyForm).GetMethod("SaveGame", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(form, null);
+        if (!LiteMonitor.GameReady.GameReadyPolicy.SamePath(options.Games[0].ProcessPath, correctedExe) || !options.Games[0].ProcessPathOverride)
+            throw new Exception("Native path-box drop must preserve the manually chosen path.");
+        Console.WriteLine("PASS native file drops add games, deduplicate and fill the process path.");
+        options.Games.Clear();
+        rebind.Invoke(form, new object?[] { null });
+        advanced.Visible = false;
         Application.DoEvents();
         using (var empty = new Bitmap(form.Width, form.Height))
         {
@@ -80,6 +102,26 @@ internal static class Program
         form.Close();
         Console.WriteLine("PASS rendered all Game Ready tabs without cleaning or launching any app: " + output);
     }
+
+    private static void DropFile(Control target, string file)
+    {
+        byte[] names = Encoding.Unicode.GetBytes(file + "\0\0");
+        IntPtr drop = GlobalAlloc(0x42, (UIntPtr)(20 + names.Length));
+        IntPtr pointer = GlobalLock(drop);
+        var data = new byte[20 + names.Length];
+        BitConverter.GetBytes(20).CopyTo(data, 0); // DROPFILES.pFiles
+        BitConverter.GetBytes(1).CopyTo(data, 16); // DROPFILES.fWide
+        names.CopyTo(data, 20);
+        Marshal.Copy(data, 0, pointer, data.Length);
+        GlobalUnlock(drop);
+        SendMessage(target.Handle, 0x0233, drop, IntPtr.Zero); // Recipient owns and releases HDROP.
+        Application.DoEvents();
+    }
+
+    [DllImport("kernel32.dll")] private static extern IntPtr GlobalAlloc(uint flags, UIntPtr size);
+    [DllImport("kernel32.dll")] private static extern IntPtr GlobalLock(IntPtr memory);
+    [DllImport("kernel32.dll")] private static extern bool GlobalUnlock(IntPtr memory);
+    [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
     private static void RenderPicker(string output)
     {

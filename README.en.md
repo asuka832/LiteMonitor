@@ -1,5 +1,7 @@
 [中文文档](./README.md)
 
+> This document describes upstream LiteMonitor. For the Game Ready fork, including its added features, build instructions and limitations, see the [Chinese README](./README.md) and [Game Ready guide](./docs/game-ready.md).
+
 # <img src="./resources/screenshots/logo.png"  width="28" style="vertical-align: middle; margin-top: -4px;" /> LiteMonitor
 
 A lightweight and fully customizable **Windows hardware monitor** — track CPU, GPU, memory, disk, and network statistics in real time.

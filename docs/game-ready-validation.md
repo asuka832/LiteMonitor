@@ -1,5 +1,14 @@
 # Game Ready 首版验证记录
 
+## 2026-11-03 游戏图标导入增量
+
+- Release 构建与 win-x64 单文件发布成功，仍为 216 项既有警告，没有编译错误；没有新增依赖。
+- 游戏核心回归通过，包括 Steam 图标匹配本地清单补齐主程序、快捷方式解析、无效快捷方式过滤、手动路径在重新扫描后保留。
+- Windows Forms 原生文件消息测试通过：拖入 EXE 添加游戏、重复拖入去重、拖入路径框更新实际进程路径；四个页面、最小尺寸和高级配置完成截图验收，位于 `artifacts/game-import-preview`。
+- 只读实机扫描识别 9 个 Steam 项目，《影之刃零》显示中文名，路径为 `E:\SteamLibrary\steamapps\common\PBZ\platform\steam\PBZ.exe`，扫描无警告。
+- 没有实际启动游戏或清理用户应用；界面测试使用合成文件投递原生消息，没有模拟鼠标从桌面拖入的完整操作。
+- 管理员窗口的文件接收采用窗口级消息过滤和 Shell 文件消息，参考 [ChangeWindowMessageFilterEx](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-changewindowmessagefilterex) 与 [WM_DROPFILES](https://learn.microsoft.com/en-us/windows/win32/shell/wm-dropfiles)。
+
 日期：2026-11-03；分支：`codex/game-ready`；上游基线：`3b91b5ca6d70a9056b8fdd01c9acddc985721240`。
 
 ## 已验证
